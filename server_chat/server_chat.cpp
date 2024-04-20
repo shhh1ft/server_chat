@@ -4,6 +4,7 @@
 #include <map>
 #include <thread>
 #include <algorithm>
+#include <Windows.h>
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -72,50 +73,50 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
     char recvBuf[DEFAULT_BUFLEN];
     int recvResult;
 
-    // Отправляем запрос на ввод имени клиента
+    
     send(client->socket, "Введите ваше имя: ", 20, 0);
     recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
     if (recvResult <= 0) {
         std::cerr << "Ошибка при получении имени клиента\n";
         closesocket(client->socket);
-        delete client; // Освобождаем память
+        delete client; 
         return;
     }
     recvBuf[recvResult] = '\0';
     client->name = recvBuf;
 
-    // Отправляем список комнат клиенту
+    
     std::string roomList = "Список комнат:\n";
     for (const auto& room : rooms) {
         roomList += room.first + "\n";
     }
     send(client->socket, roomList.c_str(), roomList.length(), 0);
 
-    // Получаем номер комнаты от клиента
+
     send(client->socket, "Введите номер комнаты: ", 30, 0);
     recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
     if (recvResult <= 0) {
         std::cerr << "Ошибка при получении номера комнаты от клиента\n";
         closesocket(client->socket);
-        delete client; // Освобождаем память
+        delete client; 
         return;
     }
     recvBuf[recvResult] = '\0';
     std::string chosenRoom = recvBuf;
 
-    // Проверяем, существует ли выбранная комната
+    
     if (rooms.find(chosenRoom) != rooms.end()) {
         client->room = chosenRoom;
         rooms[chosenRoom].push_back(*client);
         std::cout << "Клиент '" << client->name << "' подключен к комнате '" << chosenRoom << "'\n";
 
-        // Отправляем сообщение о начале чата
+       
         send(client->socket, "Чат начался!\n", 14, 0);
     }
     else {
         std::cerr << "Комната с номером '" << chosenRoom << "' не найдена\n";
         closesocket(client->socket);
-        delete client; // Освобождаем память
+        delete client; 
         return;
     }
 
@@ -125,12 +126,12 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
         if (recvResult > 0) {
             recvBuf[recvResult] = '\0';
             std::cout << "Сообщение от клиента '" << client->name << "' в комнате '" << client->room << "': " << recvBuf << std::endl;
-            // Отправляем сообщение всем клиентам в этой комнате, кроме отправителя
+            // Отправляем сообщение всем клиентам в этой комнате, включая отправителя
             for (auto& roomClient : rooms[client->room]) {
-                if (roomClient.socket != client->socket) {
-                    send(roomClient.socket, (client->name + ": " + recvBuf).c_str(), recvResult + client->name.length() + 2, 0);
-                }
+                std::string messageWithSender = client->name + ": " + recvBuf;
+                send(roomClient.socket, messageWithSender.c_str(), messageWithSender.length(), 0);
             }
+
         }
         else if (recvResult == 0) {
             std::cerr << "Соединение закрыто клиентом\n";
@@ -152,6 +153,7 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
 }
 
 int main() {
+    SetConsoleCP(1251);
     setlocale(LC_ALL, "rus");
     InitializeWinsock();
 
