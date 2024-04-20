@@ -69,23 +69,23 @@ SOCKET AcceptClientConnection(SOCKET serverSocket) {
     return clientSocket;
 }
 
-void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms) {
+void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms, std::map<std::string, std::vector<std::string>>& roomMessages) {
     char recvBuf[DEFAULT_BUFLEN];
     int recvResult;
 
-    
+
     send(client->socket, "Введите ваше имя: ", 20, 0);
     recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
     if (recvResult <= 0) {
         std::cerr << "Ошибка при получении имени клиента\n";
         closesocket(client->socket);
-        delete client; 
+        delete client;
         return;
     }
     recvBuf[recvResult] = '\0';
     client->name = recvBuf;
 
-    
+
     std::string roomList = "Список комнат:\n";
     for (const auto& room : rooms) {
         roomList += room.first + "\n";
@@ -98,25 +98,32 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
     if (recvResult <= 0) {
         std::cerr << "Ошибка при получении номера комнаты от клиента\n";
         closesocket(client->socket);
-        delete client; 
+        delete client;
         return;
     }
     recvBuf[recvResult] = '\0';
     std::string chosenRoom = recvBuf;
 
-    
+
     if (rooms.find(chosenRoom) != rooms.end()) {
         client->room = chosenRoom;
         rooms[chosenRoom].push_back(*client);
         std::cout << "Клиент '" << client->name << "' подключен к комнате '" << chosenRoom << "'\n";
+        send(client->socket, "============= ", 14, 0);
+        send(client->socket, chosenRoom.c_str(), chosenRoom.length(), 0);
+        send(client->socket, " =============\n", 16, 0);
+        send(client->socket, "Клиент '", 8, 0);
+        send(client->socket, client->name.c_str(), client->name.length(), 0);
+        send(client->socket, "' подключился к комнате ", 24, 0);
 
-       
-        send(client->socket, "Чат начался!\n", 14, 0);
+        for (const std::string& message : roomMessages[chosenRoom]) {
+            send(client->socket, message.c_str(), message.length(), 0);
+        }
     }
     else {
         std::cerr << "Комната с номером '" << chosenRoom << "' не найдена\n";
         closesocket(client->socket);
-        delete client; 
+        delete client;
         return;
     }
 
@@ -126,6 +133,11 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
         if (recvResult > 0) {
             recvBuf[recvResult] = '\0';
             std::cout << "Сообщение от клиента '" << client->name << "' в комнате '" << client->room << "': " << recvBuf << std::endl;
+
+            // Сохраняем сообщение
+            roomMessages[client->room].push_back(recvBuf);
+
+
             // Отправляем сообщение всем клиентам в этой комнате, включая отправителя
             for (auto& roomClient : rooms[client->room]) {
                 std::string messageWithSender = client->name + ": " + recvBuf;
@@ -162,6 +174,8 @@ int main() {
     std::cout << "Ждем подключения...\n";
 
     std::map<std::string, std::vector<ClientInfo>> rooms;
+    std::map<std::string, std::vector<std::string>> roomMessages; // Для хранения сообщений комнаты
+
     rooms["room1"] = std::vector<ClientInfo>();
     rooms["room2"] = std::vector<ClientInfo>();
     rooms["room3"] = std::vector<ClientInfo>();
@@ -170,7 +184,7 @@ int main() {
         SOCKET clientSocket = AcceptClientConnection(serverSocket);
         ClientInfo* newClient = new ClientInfo{ clientSocket, "", "Hub" }; // Выделяем память для нового клиента
 
-        std::thread receiveThread(ReceiveAndSendMessages, newClient, std::ref(rooms));
+        std::thread receiveThread(ReceiveAndSendMessages, newClient, std::ref(rooms), std::ref(roomMessages));
         receiveThread.detach(); // Позволяет потоку работать асинхронно
     }
 

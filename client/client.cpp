@@ -77,19 +77,56 @@ void SendMessageThread(SOCKET clientSocket) {
         std::string message;
         std::getline(std::cin, message);
         SendToServer(clientSocket, message.c_str());
-        
+
     }
 }
+
+void InputName(SOCKET clientSocket) {
+    std::string name;
+    std::getline(std::cin, name);
+    SendToServer(clientSocket, name.c_str());
+}
+
+void InputRoom(SOCKET clientSocket) {
+    std::string roomNumber;
+    std::getline(std::cin, roomNumber);
+    SendToServer(clientSocket, roomNumber.c_str());
+}
+
 
 int main() {
     SetConsoleCP(1251);
     setlocale(LC_ALL, "rus");
     InitializeWinsock();
-
-    const char* ipAddress = "26.162.182.51";
+    std::string ipAddress = "26.255.228.69";
     int port = 12345;
+    std::string choice;
+    do {
+        std::cout << "Выберите операцию:\n 1. Подключиться \n 2. Кастомный ip \n 3. Кастомный порт \n q. Выход.\n Выбор: ";
+        std::getline(std::cin, choice);
 
-    SOCKET clientSocket = ConnectToServer(ipAddress, port);
+        if (choice == "1") {
+            break;
+        }
+        else if (choice == "2") {
+            std::cout << "Введите IP адрес сервера: ";
+            std::getline(std::cin, ipAddress);
+        }
+        else if (choice == "3") {
+            std::string str_port;
+            std::cout << "Введите Порт сервера: ";
+            std::getline(std::cin, str_port);
+            port = std::stoi(str_port);
+        }
+        else if (choice == "q") {
+            return 0; 
+        }
+        else {
+            std::cout << "Неправильный выбор \n";
+        }
+    } while (choice != "1");
+
+    SOCKET clientSocket = ConnectToServer(ipAddress.c_str(), port);
     std::cout << "Подключение к серверу успешно\n";
 
     char recvBuf[BUFLEN];
@@ -98,9 +135,7 @@ int main() {
     int recvResult = ReceiveFromServer(clientSocket, recvBuf);
     std::cout << recvBuf;
 
-    std::string name;
-    std::getline(std::cin, name);
-    SendToServer(clientSocket, name.c_str());
+    InputName(clientSocket);
 
     recvResult = ReceiveFromServer(clientSocket, recvBuf);
     std::cout << recvBuf;
@@ -108,9 +143,7 @@ int main() {
     recvResult = ReceiveFromServer(clientSocket, recvBuf);
     std::cout << recvBuf;
 
-    std::string roomNumber;
-    std::getline(std::cin, roomNumber);
-    SendToServer(clientSocket, roomNumber.c_str());
+    InputRoom(clientSocket);
 
     std::thread sendThread(SendMessageThread, clientSocket);
     sendThread.detach();
@@ -122,7 +155,7 @@ int main() {
         for (int i = 0; i < messageHistory.size(); ++i) {
             std::cout << messageHistory[i] << std::endl;
         }
-        
+
     }
 
     closesocket(clientSocket);
