@@ -5,6 +5,9 @@
 #include <thread>
 #include <algorithm>
 #include <Windows.h>
+#include <ctime>
+#include <iomanip>
+#include "Message.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -69,11 +72,18 @@ SOCKET AcceptClientConnection(SOCKET serverSocket) {
     return clientSocket;
 }
 
+void SendPreviousMessagesToClient(ClientInfo* client, const std::vector<std::string>& messages) {
+    for (const auto& msg : messages) {
+        std::string messageWithSender = client->name + ": " + msg;
+        send(client->socket, messageWithSender.c_str(), messageWithSender.length(), 0);
+    }
+}
+
 void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms, std::map<std::string, std::vector<std::string>>& roomMessages) {
     char recvBuf[DEFAULT_BUFLEN];
     int recvResult;
 
-
+    // Получение имени клиента
     send(client->socket, "Введите ваше имя: ", 20, 0);
     recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
     if (recvResult <= 0) {
@@ -85,14 +95,14 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
     recvBuf[recvResult] = '\0';
     client->name = recvBuf;
 
-
+    // Отправка списка комнат клиенту
     std::string roomList = "Список комнат:\n";
     for (const auto& room : rooms) {
         roomList += room.first + "\n";
     }
     send(client->socket, roomList.c_str(), roomList.length(), 0);
 
-
+    // Получение номера комнаты от клиента
     send(client->socket, "Введите номер комнаты: ", 30, 0);
     recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
     if (recvResult <= 0) {
@@ -104,7 +114,7 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
     recvBuf[recvResult] = '\0';
     std::string chosenRoom = recvBuf;
 
-
+    // Проверка существования комнаты
     if (rooms.find(chosenRoom) != rooms.end()) {
         client->room = chosenRoom;
         rooms[chosenRoom].push_back(*client);
@@ -116,9 +126,8 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
         send(client->socket, client->name.c_str(), client->name.length(), 0);
         send(client->socket, "' подключился к комнате ", 24, 0);
 
-        for (const std::string& message : roomMessages[chosenRoom]) {
-            send(client->socket, message.c_str(), message.length(), 0);
-        }
+        // Отправляем предыдущие сообщения клиенту
+        SendPreviousMessagesToClient(client, roomMessages[chosenRoom]);
     }
     else {
         std::cerr << "Комната с номером '" << chosenRoom << "' не найдена\n";
@@ -132,18 +141,24 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
         recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
         if (recvResult > 0) {
             recvBuf[recvResult] = '\0';
+
             std::cout << "Сообщение от клиента '" << client->name << "' в комнате '" << client->room << "': " << recvBuf << std::endl;
 
-            // Сохраняем сообщение
-            roomMessages[client->room].push_back(recvBuf);
+            // Создаем объект сообщения
+            Message newMessage(client->name, recvBuf);
 
+            // Сохраняем сообщение в файл
+            std::string filename = client->room + "_messages.txt";
+            newMessage.saveToFile(filename);
+
+            // Добавляем сообщение в список сообщений комнаты
+            roomMessages[client->room].push_back(recvBuf);
 
             // Отправляем сообщение всем клиентам в этой комнате, включая отправителя
             for (auto& roomClient : rooms[client->room]) {
                 std::string messageWithSender = client->name + ": " + recvBuf;
-                send(roomClient.socket, messageWithSender.c_str(), messageWithSender.length(), 0);
+                send(roomClient.socket, messageWithSender.c_str(), messageWithSender.length() + 30, 0);
             }
-
         }
         else if (recvResult == 0) {
             std::cerr << "Соединение закрыто клиентом\n";
@@ -163,6 +178,7 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
         }
     }
 }
+
 
 int main() {
     SetConsoleCP(1251);

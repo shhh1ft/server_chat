@@ -6,6 +6,7 @@
 #include <Windows.h>
 #include <cstdlib>
 #include <vector>
+
 #pragma comment(lib, "ws2_32.lib")
 
 #define BUFLEN 512
@@ -101,6 +102,8 @@ int main() {
     std::string ipAddress = "26.255.228.69";
     int port = 12345;
     std::string choice;
+    SOCKET clientSocket;
+
     do {
         std::cout << "Выберите операцию:\n 1. Подключиться \n 2. Кастомный ip \n 3. Кастомный порт \n q. Выход.\n Выбор: ";
         std::getline(std::cin, choice);
@@ -119,14 +122,14 @@ int main() {
             port = std::stoi(str_port);
         }
         else if (choice == "q") {
-            return 0; 
+            return 0;
         }
         else {
             std::cout << "Неправильный выбор \n";
         }
     } while (choice != "1");
 
-    SOCKET clientSocket = ConnectToServer(ipAddress.c_str(), port);
+    clientSocket = ConnectToServer(ipAddress.c_str(), port);
     std::cout << "Подключение к серверу успешно\n";
 
     char recvBuf[BUFLEN];
@@ -145,9 +148,7 @@ int main() {
 
     InputRoom(clientSocket);
 
-    std::thread sendThread(SendMessageThread, clientSocket);
-    sendThread.detach();
-    system("cls");
+    // Ожидание получения сообщений от сервера перед запуском потока отправки сообщений
     while (true) {
         recvResult = ReceiveFromServer(clientSocket, recvBuf);
         messageHistory.push_back(recvBuf);
@@ -156,6 +157,21 @@ int main() {
             std::cout << messageHistory[i] << std::endl;
         }
 
+        if (messageHistory.size() > 0) {
+            std::thread sendThread(SendMessageThread, clientSocket);
+            sendThread.detach();
+            break;
+        }
+    }
+
+    // После получения и отображения предыдущих сообщений, клиент продолжает ожидать и отображать новые сообщения
+    while (true) {
+        recvResult = ReceiveFromServer(clientSocket, recvBuf);
+        messageHistory.push_back(recvBuf);
+        system("cls");
+        for (int i = 0; i < messageHistory.size(); ++i) {
+            std::cout << messageHistory[i] << std::endl;
+        }
     }
 
     closesocket(clientSocket);
