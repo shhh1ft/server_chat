@@ -101,8 +101,9 @@ int main() {
     SetConsoleCP(1251);
     setlocale(LC_ALL, "rus");
     InitializeWinsock();
-    ConfigClient networkInfo("client_info.txt");
-    std::ifstream file("client_info.txt");
+    std::string filenameConfig = "client_info.txt";
+    ConfigClient networkInfo(filenameConfig);
+    std::ifstream file(filenameConfig);
 
     bool fileEmpty = !file || file.peek() == std::ifstream::traits_type::eof();
     file.close();
@@ -177,7 +178,7 @@ int main() {
             case '5': {
                 system("cls");
                 std::string Input;
-                std::cout << "Введите IP адрес сервера (0 - оставить прошлое значение): ";
+                std::cout << "Введите IP адрес сервера (enter - оставить прошлое значение " << ipAddress << "): ";
                 std::getline(std::cin, Input);
                 if (Input != "" && Input != "0") {
                     std::regex ip_regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$");
@@ -188,7 +189,7 @@ int main() {
                     ipAddress = Input;
                 }
                 Input = "";
-                std::cout << "Введите порт сервера (0 - оставить прошлое значение): ";
+                std::cout << "Введите порт сервера (enter - оставить прошлое значение " << port << "): ";
                 std::getline(std::cin, Input);
                 if (Input != "" && Input != "0") {
 
@@ -205,7 +206,7 @@ int main() {
                     }
                 }
                 Input = "";
-                ConfigClient networkInfo("network_info.txt");
+                ConfigClient networkInfo(filenameConfig);
                 networkInfo.writeInfo(ipAddress, port);
                 break;
             }

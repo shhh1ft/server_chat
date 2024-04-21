@@ -13,7 +13,7 @@ private:
     
     std::string generateRandomName(std::string id) {
         std::string name = "User";
-        name += " #";
+        name += "#";
         name += id[1];
         name += id[4];
         name += id[6];
