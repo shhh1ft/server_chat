@@ -4,19 +4,20 @@
 #include <fstream>
 #include <string>
 #include <map>
-#include <ctime>
 #include <cstdlib>
 
 class MACHandler {
 private:
     std::string filename;
     std::map<std::string, std::string> idMap;
-
-    // Генерация случайного имени
-    std::string generateRandomName() {
+    
+    std::string generateRandomName(std::string id) {
         std::string name = "User";
-        int randomNum = std::rand() % 1000;
-        name += std::to_string(randomNum);
+        name += " #";
+        name += id[1];
+        name += id[4];
+        name += id[6];
+        name += id[3];
         return name;
     }
 
@@ -34,7 +35,7 @@ public:
 
     void addID(const std::string& id) {
         if (idMap.find(id) == idMap.end()) {
-            std::string randomName = generateRandomName();
+            std::string randomName = generateRandomName(id);
             idMap[id] = randomName;
 
             // Записываем данные в файл

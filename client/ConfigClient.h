@@ -21,22 +21,18 @@ public:
     ConfigClient(const std::string& filename) : filename(filename) {}
 
     void writeInfo(const std::string& ipAddress, int port) {
-        if (isFileEmpty()) { // Проверяем, пуст ли файл
-            std::ofstream outFile(filename);
-            if (outFile.is_open()) {
-                std::string macAddress = getMacAddress(); // Получаем MAC адрес
-                outFile << ipAddress << "," << macAddress << "," << port << std::endl;
-                outFile.close();
-                std::cout << "Конфиг записан " << filename << std::endl;
-            }
-            else {
-                std::cerr << "Ошибка открытия файла  " << filename << std::endl;
-            }
+        std::ofstream outFile(filename, std::ios::trunc);
+        if (outFile.is_open()) {
+            std::string macAddress = getMacAddress();
+            outFile << ipAddress << "," << macAddress << "," << port << std::endl;
+            outFile.close();
+            std::cout << "Конфиг записан " << filename << std::endl;
         }
         else {
-            std::cout << "Файл " << filename << " не пустой пропускаем операцию." << std::endl;
+            std::cerr << "Ошибка открытия файла  " << filename << std::endl;
         }
     }
+
 
     void printInfo(const std::string& ipAddress, int port) {
         std::cout << "IP Address: " << ipAddress
