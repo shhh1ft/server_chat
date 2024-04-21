@@ -10,15 +10,28 @@ class MACHandler {
 private:
     std::string filename;
     std::map<std::string, std::string> idMap;
-    
-    std::string generateRandomName(std::string id) {
-        std::string name = "User";
+
+    std::string generateRandomName(std::string id, std::string nick) {
+        std::string name = nick;
         name += "#";
         name += id[1];
         name += id[4];
         name += id[6];
         name += id[3];
         return name;
+    }
+
+    void writeToFile() {
+        std::ofstream file(filename);
+        if (file.is_open()) {
+            for (const auto& pair : idMap) {
+                file << pair.first << " " << pair.second << std::endl;
+            }
+            file.close();
+        }
+        else {
+            std::cerr << "Ошибка: Не удалось открыть файл для записи." << std::endl;
+        }
     }
 
 public:
@@ -35,18 +48,12 @@ public:
 
     void addID(const std::string& id) {
         if (idMap.find(id) == idMap.end()) {
-            std::string randomName = generateRandomName(id);
+            std::string nick = "Пользователь"; // Изменение по-умолчанию
+            std::string randomName = generateRandomName(id, nick);
             idMap[id] = randomName;
 
             // Записываем данные в файл
-            std::ofstream file(filename, std::ios_base::app);
-            if (file.is_open()) {
-                file << id << " " << randomName << std::endl;
-                file.close();
-            }
-            else {
-                std::cerr << "Error: Unable to open file for writing." << std::endl;
-            }
+            writeToFile();
         }
     }
 
@@ -57,6 +64,14 @@ public:
         }
         else {
             return "";
+        }
+    }
+
+    void changeNick(const std::string& id, const std::string& newNick) {
+        auto it = idMap.find(id);
+        if (it != idMap.end()) {
+            it->second = newNick;
+            writeToFile();
         }
     }
 };

@@ -91,10 +91,11 @@ void InputName(SOCKET clientSocket) {
     SendToServer(clientSocket, name.c_str());
 }
 
-void InputRoom(SOCKET clientSocket) {
+std::string InputOption(SOCKET clientSocket) {
     std::string roomNumber;
     std::getline(std::cin, roomNumber);
     SendToServer(clientSocket, roomNumber.c_str());
+    return roomNumber;
 }
 
 int main() {
@@ -124,7 +125,8 @@ int main() {
     SOCKET clientSocket;;
 
     do {
-        std::cout << "Выберите операцию:\n"
+        std::cout << "^^^^^^^^^^^^^^^^^Клиент локльного чата v0.3^^^^^^^^^^^^^^^^^\n"
+                     "Выберите операцию:\n"
                      " 1. Подключиться\n"
                      " 2. Ввести кастомный IP\n"
                      " 3. Ввести кастомный порт\n"
@@ -220,7 +222,7 @@ int main() {
             }
         }
     } while (choice[0] != '1');
-
+    system("cls");
     clientSocket = ConnectToServer(ipAddress.c_str(), port);
     std::cout << "Подключение к серверу успешно\n";
     SendToServer(clientSocket, macAddress.c_str());
@@ -229,15 +231,13 @@ int main() {
 
     int recvResult = ReceiveFromServer(clientSocket, recvBuf);
     std::cout << recvBuf;
-
-    recvResult = ReceiveFromServer(clientSocket, recvBuf);
-    std::cout << recvBuf;
-
-    recvResult = ReceiveFromServer(clientSocket, recvBuf);
-    std::cout << recvBuf;
-
-    InputRoom(clientSocket);
-
+    std::string Option = InputOption(clientSocket);
+    if (Option == "c") {
+        recvResult = ReceiveFromServer(clientSocket, recvBuf);
+        std::cout << recvBuf;
+        InputOption(clientSocket);
+    }
+    system("cls");
     
     while (true) {
         recvResult = ReceiveFromServer(clientSocket, recvBuf);
