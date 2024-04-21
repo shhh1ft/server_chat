@@ -105,29 +105,39 @@ int main() {
     SOCKET clientSocket;
 
     do {
-        std::cout << "Выберите операцию:\n 1. Подключиться \n 2. Кастомный ip \n 3. Кастомный порт \n q. Выход.\n Выбор: ";
+        std::cout << "Выберите операцию:\n"
+                     " 1. Подключиться\n"
+                     " 2. Ввести кастомный IP\n"
+                     " 3. Ввести кастомный порт\n"
+                     " q. Выход.\n"
+                     "Выбор: ";
         std::getline(std::cin, choice);
 
-        if (choice == "1") {
-            break;
+        switch (choice[0]) {
+            case '1': {
+                break;
+            }
+            case '2': {
+                std::cout << "Введите IP адрес сервера: ";
+                std::getline(std::cin, ipAddress);
+                break;
+            }
+            case '3': {
+                std::string str_port;
+                std::cout << "Введите порт сервера: ";
+                std::getline(std::cin, str_port);
+                port = std::stoi(str_port);
+                break;
+            }
+            case 'q': {
+                return 0;
+            }
+            default: {
+                std::cout << "Неправильный выбор\n";
+                break;
+            }
         }
-        else if (choice == "2") {
-            std::cout << "Введите IP адрес сервера: ";
-            std::getline(std::cin, ipAddress);
-        }
-        else if (choice == "3") {
-            std::string str_port;
-            std::cout << "Введите Порт сервера: ";
-            std::getline(std::cin, str_port);
-            port = std::stoi(str_port);
-        }
-        else if (choice == "q") {
-            return 0;
-        }
-        else {
-            std::cout << "Неправильный выбор \n";
-        }
-    } while (choice != "1");
+    } while (choice[0] != '1');
 
     clientSocket = ConnectToServer(ipAddress.c_str(), port);
     std::cout << "Подключение к серверу успешно\n";
@@ -148,7 +158,7 @@ int main() {
 
     InputRoom(clientSocket);
 
-    // Ожидание получения сообщений от сервера перед запуском потока отправки сообщений
+    
     while (true) {
         recvResult = ReceiveFromServer(clientSocket, recvBuf);
         messageHistory.push_back(recvBuf);
@@ -164,7 +174,7 @@ int main() {
         }
     }
 
-    // После получения и отображения предыдущих сообщений, клиент продолжает ожидать и отображать новые сообщения
+    
     while (true) {
         recvResult = ReceiveFromServer(clientSocket, recvBuf);
         messageHistory.push_back(recvBuf);
@@ -179,3 +189,4 @@ int main() {
 
     return 0;
 }
+
