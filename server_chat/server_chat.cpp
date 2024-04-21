@@ -8,6 +8,7 @@
 #include <ctime>
 #include <iomanip>
 #include "Message.h"
+#include "Profiles.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -16,6 +17,7 @@
 struct ClientInfo {
     SOCKET socket;
     std::string name;
+    std::string macAddress;
     std::string room;
 };
 
@@ -86,7 +88,6 @@ void SendPreviousMessagesToClient(ClientInfo* client, std::string chosenRoom) {
     }
 }
 
-
 std::string getTimeserv() {
     std::time_t now = std::time(nullptr);
     char buffer[80];
@@ -100,16 +101,21 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
     char recvBuf[DEFAULT_BUFLEN];
     int recvResult;
 
-    send(client->socket, "Введите ваше имя: ", 20, 0);
+    send(client->socket, "Получение MAC адреса клиента", 20, 0);
     recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
     if (recvResult <= 0) {
-        std::cerr << "Ошибка при получении имени клиента\n";
+        std::cerr << "Ошибка при получении MAC адреса клиента\n";
         closesocket(client->socket);
         delete client;
         return;
     }
     recvBuf[recvResult] = '\0';
-    client->name = recvBuf;
+
+    client->macAddress = recvBuf;
+    std::cout << client->macAddress;
+    MACHandler idHandler("profiles.txt");
+    idHandler.addID(client->macAddress);
+    client->name = idHandler.getNameByMAC(client->macAddress);
 
     std::string roomList = "Список комнат:\n";
     for (const auto& room : rooms) {
@@ -138,7 +144,7 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
                 send(roomClient.socket, joinMessage.c_str(), joinMessage.length(), 0);
             }
         }
-        std::string msgroom = "=================== " + chosenRoom + " ===================";
+        std::string msgroom = "===================== " + chosenRoom + " =====================";
         send(client->socket, msgroom.c_str(), msgroom.length(), 0);
         SendPreviousMessagesToClient(client, chosenRoom);
     }
@@ -191,10 +197,10 @@ int main() {
 
     SOCKET serverSocket = CreateServerSocket(12345);
 
-    std::cout << "Ждем подключения...\n";
+    std::cout << "Сервер успешно запущен\n";
 
     std::map<std::string, std::vector<ClientInfo>> rooms;
-    std::map<std::string, std::vector<std::string>> roomMessages; // Для хранения сообщений комнаты
+    std::map<std::string, std::vector<std::string>> roomMessages;
 
     rooms["room1"] = std::vector<ClientInfo>();
     rooms["room2"] = std::vector<ClientInfo>();
@@ -202,10 +208,9 @@ int main() {
 
     while (true) {
         SOCKET clientSocket = AcceptClientConnection(serverSocket);
-        ClientInfo* newClient = new ClientInfo{ clientSocket, "", "Hub" }; // Выделяем память для нового клиента
-
+        ClientInfo* newClient = new ClientInfo{ clientSocket, "", "Hub" };
         std::thread receiveThread(ReceiveAndSendMessages, newClient, std::ref(rooms), std::ref(roomMessages));
-        receiveThread.detach(); // Позволяет потоку работать асинхронно
+        receiveThread.detach();
     }
 
     closesocket(serverSocket);
