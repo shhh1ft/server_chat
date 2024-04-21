@@ -159,7 +159,6 @@ int main() {
                 std::cout << "Введите порт сервера: ";
                 std::getline(std::cin, str_port);
 
-                // Проверка правильности формата порта
                 try {
                     port = std::stoi(str_port);
                     if (port < 1 || port > 65535) {

@@ -35,8 +35,8 @@ public:
 
 
     void printInfo(const std::string& ipAddress, int port) {
-        std::cout << "IP Address: " << ipAddress
-            << ", Port: " << port << "\n\n";
+        std::cout << "IP Адрес: " << ipAddress
+            << ", Порт: " << port << "\n\n";
     }
 
     bool isFileEmpty() {

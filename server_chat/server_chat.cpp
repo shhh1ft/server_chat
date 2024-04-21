@@ -147,9 +147,10 @@ void ShowMenuAndSelectRoom(ClientInfo* client, std::map<std::string, std::vector
         }
         recvBuf[recvResult] = '\0';
         idHandler.changeNick(client->macAddress, recvBuf);
+        ShowMenuAndSelectRoom(client, rooms);
     }
     else {
-        send(client->socket, "Неверный выбор.\n", 30, 0);
+        send(client->socket, "Неверный выбор. Нажмите enter...", 30, 0);
         ShowMenuAndSelectRoom(client, rooms);
     }
 }
