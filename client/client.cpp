@@ -12,7 +12,7 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-#define BUFLEN 512
+#define BUFLEN 4096
 
 void InitializeWinsock() {
     WSADATA wsData;
@@ -81,21 +81,107 @@ void SendMessageThread(SOCKET clientSocket) {
         std::string message;
         std::getline(std::cin, message);
         SendToServer(clientSocket, message.c_str());
-
     }
 }
-
-void InputName(SOCKET clientSocket) {
-    std::string name;
-    std::getline(std::cin, name);
-    SendToServer(clientSocket, name.c_str());
+void displayMenu() {
+    std::cout << "^^^^^^^^^^^^^^^^^Клиент локального чата v0.3^^^^^^^^^^^^^^^^^\n"
+        "Выберите операцию:\n"
+        " 1. Подключиться\n"
+        " 2. Ввести кастомный IP\n"
+        " 3. Ввести кастомный порт\n"
+        " 4. Вывести мой конфиг подключения\n"
+        " 5. Изменить мой конфиг\n"
+        " q. Выход.\n"
+        "Выбор: ";
 }
 
-std::string InputOption(SOCKET clientSocket) {
-    std::string roomNumber;
-    std::getline(std::cin, roomNumber);
-    SendToServer(clientSocket, roomNumber.c_str());
-    return roomNumber;
+void MenuChoice(std::string choice, std::string& ipAddress, int& port, const std::string& filenameConfig, ConfigClient& networkInfo) {
+    switch (choice[0]) {
+    case '1': {
+        break;
+    }
+    case '2': {
+        system("cls");
+        std::cout << "Введите IP адрес сервера: ";
+        std::string input;
+        std::getline(std::cin, input);
+        std::regex ip_regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$");
+        if (!std::regex_match(input, ip_regex)) {
+            std::cout << "Неправильный формат IP-адреса\n";
+            break;
+        }
+        else {
+            ipAddress = input;
+        }
+        break;
+    }
+    case '3': {
+        system("cls");
+        std::string str_port;
+        std::cout << "Введите порт сервера: ";
+        std::getline(std::cin, str_port);
+
+        try {
+            port = std::stoi(str_port);
+            if (port < 1 || port > 65535) {
+                throw std::invalid_argument("Недопустимый порт");
+            }
+        }
+        catch (std::invalid_argument& e) {
+            std::cout << "Неправильный формат порта: " << e.what() << std::endl;
+            break;
+        }
+        break;
+    }
+    case '4': {
+        system("cls");
+        networkInfo.printInfo(ipAddress, port);
+        break;
+    }
+    case '5': {
+        system("cls");
+        std::string Input;
+        std::cout << "Введите IP адрес сервера (enter - оставить прошлое значение " << ipAddress << "): ";
+        std::getline(std::cin, Input);
+        if (Input != "" && Input != "0") {
+            std::regex ip_regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$");
+            if (!std::regex_match(Input, ip_regex)) {
+                std::cout << "Неправильный формат IP-адреса\n";
+                break;
+            }
+            ipAddress = Input;
+        }
+        Input = "";
+        std::cout << "Введите порт сервера (enter - оставить прошлое значение " << port << "): ";
+        std::getline(std::cin, Input);
+        if (Input != "" && Input != "0") {
+            try {
+                int newPort = std::stoi(Input);
+                if (newPort < 1 || newPort > 65535) {
+                    throw std::invalid_argument("Недопустимый порт");
+                }
+                port = newPort;
+            }
+            catch (std::invalid_argument& e) {
+                std::cout << "Неправильный формат порта: " << e.what() << std::endl;
+                break;
+            }
+        }
+        Input = "";
+        ConfigClient networkInfo(filenameConfig);
+        networkInfo.writeInfo(ipAddress, port);
+        break;
+    }
+
+    case 'q': {
+        exit(0);
+    }
+    default: {
+        std::cout << "Неправильный выбор\n";
+        system("cls");
+        break;
+    }
+    }
 }
 
 int main() {
@@ -110,10 +196,8 @@ int main() {
     file.close();
 
     if (fileEmpty) {
-
         networkInfo.writeInfo("127.0.0.1", 12345);
     }
-
 
     std::string ipAddress;
     int port;
@@ -125,127 +209,29 @@ int main() {
     SOCKET clientSocket;;
 
     do {
-        std::cout << "^^^^^^^^^^^^^^^^^Клиент локльного чата v0.3^^^^^^^^^^^^^^^^^\n"
-                     "Выберите операцию:\n"
-                     " 1. Подключиться\n"
-                     " 2. Ввести кастомный IP\n"
-                     " 3. Ввести кастомный порт\n"
-                     " 4. Вывести мой конфиг подключения\n"
-                     " 5. Изменить мой конфиг\n"
-                     " q. Выход.\n"
-                     "Выбор: ";
+        displayMenu();
         std::getline(std::cin, choice);
-
-        switch (choice[0]) {
-            case '1': {
-                break;
-            }
-            case '2': {
-                system("cls");
-                std::cout << "Введите IP адрес сервера: ";
-                std::getline(std::cin, ipAddress);
-
-                // Проверка правильности формата IP-адреса
-                std::regex ip_regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$");
-                if (!std::regex_match(ipAddress, ip_regex)) {
-                    std::cout << "Неправильный формат IP-адреса\n";
-                    break;
-                }
-                break;
-            }
-            case '3': {
-                system("cls");
-                std::string str_port;
-                std::cout << "Введите порт сервера: ";
-                std::getline(std::cin, str_port);
-
-                try {
-                    port = std::stoi(str_port);
-                    if (port < 1 || port > 65535) {
-                        throw std::invalid_argument("Недопустимый порт");
-                    }
-                }
-                catch (std::invalid_argument& e) {
-                    std::cout << "Неправильный формат порта: " << e.what() << std::endl;
-                    break;
-                }
-                break;
-            }
-            case '4': {
-                system("cls");
-                networkInfo.printInfo(ipAddress, port);
-                break;
-            }
-            case '5': {
-                system("cls");
-                std::string Input;
-                std::cout << "Введите IP адрес сервера (enter - оставить прошлое значение " << ipAddress << "): ";
-                std::getline(std::cin, Input);
-                if (Input != "" && Input != "0") {
-                    std::regex ip_regex("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$");
-                    if (!std::regex_match(Input, ip_regex)) {
-                        std::cout << "Неправильный формат IP-адреса\n";
-                        break;
-                    }
-                    ipAddress = Input;
-                }
-                Input = "";
-                std::cout << "Введите порт сервера (enter - оставить прошлое значение " << port << "): ";
-                std::getline(std::cin, Input);
-                if (Input != "" && Input != "0") {
-
-                    try {
-                        int newPort = std::stoi(Input);
-                        if (newPort < 1 || newPort > 65535) {
-                            throw std::invalid_argument("Недопустимый порт");
-                        }
-                        port = newPort;
-                    }
-                    catch (std::invalid_argument& e) {
-                        std::cout << "Неправильный формат порта: " << e.what() << std::endl;
-                        break;
-                    }
-                }
-                Input = "";
-                ConfigClient networkInfo(filenameConfig);
-                networkInfo.writeInfo(ipAddress, port);
-                break;
-            }
-
-            case 'q': {
-                return 0;
-            }
-            default: {
-                std::cout << "Неправильный выбор\n";
-                break;
-            }
-        }
+        MenuChoice(choice, ipAddress, port, filenameConfig, networkInfo);
     } while (choice[0] != '1');
     system("cls");
     clientSocket = ConnectToServer(ipAddress.c_str(), port);
     std::cout << "Подключение к серверу успешно\n";
+
     SendToServer(clientSocket, macAddress.c_str());
+
     char recvBuf[BUFLEN];
     std::vector<std::string> messageHistory;
 
-    int recvResult = ReceiveFromServer(clientSocket, recvBuf);
-    std::cout << recvBuf;
-    std::string Option = InputOption(clientSocket);
-    if (Option == "c") {
-        recvResult = ReceiveFromServer(clientSocket, recvBuf);
-        std::cout << recvBuf;
-        InputOption(clientSocket);
-    }
-    system("cls");
-    
+    int recvResult;
+
+
     while (true) {
         recvResult = ReceiveFromServer(clientSocket, recvBuf);
+
         messageHistory.push_back(recvBuf);
-        system("cls");
         for (int i = 0; i < messageHistory.size(); ++i) {
             std::cout << messageHistory[i] << std::endl;
         }
-
         if (messageHistory.size() > 0) {
             std::thread sendThread(SendMessageThread, clientSocket);
             sendThread.detach();
@@ -253,7 +239,6 @@ int main() {
         }
     }
 
-    
     while (true) {
         recvResult = ReceiveFromServer(clientSocket, recvBuf);
         messageHistory.push_back(recvBuf);
@@ -268,4 +253,3 @@ int main() {
 
     return 0;
 }
-

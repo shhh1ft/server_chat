@@ -7,12 +7,13 @@
 #include <Windows.h>
 #include <ctime>
 #include <iomanip>
+#include <regex>
 #include "Message.h"
 #include "Profiles.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
-#define DEFAULT_BUFLEN 512
+#define BUFLEN 4096
 
 struct ClientInfo {
     SOCKET socket;
@@ -57,6 +58,8 @@ SOCKET CreateServerSocket(int port) {
         exit(EXIT_FAILURE);
     }
 
+    std::cout << "Сервер успешно запущен\n";
+
     return serverSocket;
 }
 
@@ -97,6 +100,11 @@ std::string getTimeserv() {
     return std::string(buffer);
 }
 
+bool isValidNickname(const std::string& nickname) {
+    std::regex pattern("^[a-zA-Z0-9_-]+$");
+    return std::regex_match(nickname, pattern);
+}
+
 void ShowMenuAndSelectRoom(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms) {
     std::string msgMenu = "Чаты:\n"
         " 1. Комната 1\n"
@@ -106,11 +114,12 @@ void ShowMenuAndSelectRoom(ClientInfo* client, std::map<std::string, std::vector
         " =-= Настройки =-=\n"
         " p. Посмотреть свой профиль\n"
         " c. Изменить имя\n"
-        "Выбор: ";
+        " q. Отключиться\n"
+        "Выбор";
     send(client->socket, msgMenu.c_str(), msgMenu.length(), 0);
 
-    char recvBuf[DEFAULT_BUFLEN];
-    int recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
+    char recvBuf[BUFLEN];
+    int recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
     if (recvResult <= 0) {
         std::cerr << "Ошибка при получении выбора комнаты от клиента\n";
         closesocket(client->socket);
@@ -134,42 +143,59 @@ void ShowMenuAndSelectRoom(ClientInfo* client, std::map<std::string, std::vector
         send(client->socket, msgroom.c_str(), msgroom.length(), 0);
         SendPreviousMessagesToClient(client, roomName);
     }
-    else if(chosenOption == "c") {
-        std::string msgnick = "Новый ник: ";
+    else if (chosenOption == "c") {
+        std::string msgnick = "Введите новый Новый ник (без пробелов и спец. символов) Старый никнейм: " + client->name;
         send(client->socket, msgnick.c_str(), msgnick.length(), 0);
         MACHandler idHandler("profiles.txt");
-        recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
+        recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
         if (recvResult <= 0) {
             std::cerr << "Ошибка при получении выбора комнаты от клиента\n";
             closesocket(client->socket);
             delete client;
-            return;
-        }
+        } 
         recvBuf[recvResult] = '\0';
-        idHandler.changeNick(client->macAddress, recvBuf);
-        ShowMenuAndSelectRoom(client, rooms);
+
+        std::string newNickname = recvBuf;
+        if (!isValidNickname(newNickname)) {
+            std::string errorMsg = "Новый ник содержит недопустимые символы или пробелы.\n";
+            send(client->socket, errorMsg.c_str(), errorMsg.length(), 0);
+        }
+        else {
+            idHandler.changeNick(client->macAddress, newNickname);
+            ShowMenuAndSelectRoom(client, rooms);
+        }
+
+    }
+    else if (chosenOption == "q") {
+        std::string disconnectMsg = "Вы отключены от чата.";
+        send(client->socket, disconnectMsg.c_str(), disconnectMsg.length(), 0);
+        closesocket(client->socket);
+        delete client;
+        return;
     }
     else {
-        send(client->socket, "Неверный выбор. Нажмите enter...", 30, 0);
+        send(client->socket, "Неверный выбор.", 30, 0);
         ShowMenuAndSelectRoom(client, rooms);
     }
 }
 
 
 void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms, std::map<std::string, std::vector<std::string>>& roomMessages) {
-    char recvBuf[DEFAULT_BUFLEN];
+    char recvBuf[BUFLEN];
     int recvResult;
-    recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
+    recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
     if (recvResult <= 0) {
         std::cerr << "Ошибка при получении MAC адреса клиента\n";
         closesocket(client->socket);
         delete client;
         return;
     }
+
     recvBuf[recvResult] = '\0';
 
     client->macAddress = recvBuf;
-    MACHandler idHandler("profiles.txt");
+    const std::string filenameprofiles = "profiles.txt";
+    MACHandler idHandler(filenameprofiles);
     idHandler.addID(client->macAddress);
     client->name = idHandler.getNameByMAC(client->macAddress);
     std::cout <<"Пользователь " << client->name << " присоединился к серверу. MAC адрес: " << client->macAddress << '\n';
@@ -178,19 +204,35 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
 
 
     while (true) {
-        recvResult = recv(client->socket, recvBuf, DEFAULT_BUFLEN, 0);
+        recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
         if (recvResult > 0) {
             recvBuf[recvResult] = '\0';
+            if (strcmp(recvBuf, "/hub") != 0 || strcmp(recvBuf, "/disconnect") != 0) {
 
-            std::cout << "Сообщение от клиента '" << client->name << "' в комнате '" << client->room << "': " << recvBuf << std::endl;
+                std::cout << "Сообщение от клиента '" << client->name << "' в комнате '" << client->room << "': " << recvBuf << std::endl;
 
-            Message newMessage(client->name, recvBuf, getTimeserv());
-            std::string filename = client->room + "_messages.txt";
-            newMessage.saveToFile(filename);
-            roomMessages[client->room].push_back(recvBuf);
-            for (auto& roomClient : rooms[client->room]) {
-                std::string messageWithSender = "[" + getTimeserv() + "] " + client->name + ": " + recvBuf;
-                send(roomClient.socket, messageWithSender.c_str(), messageWithSender.length() + 30, 0);
+                Message newMessage(client->name, recvBuf, getTimeserv());
+                std::string filename = client->room + "_messages.txt";
+                newMessage.saveToFile(filename);
+
+                roomMessages[client->room].push_back(recvBuf);
+                for (auto& roomClient : rooms[client->room]) {
+                    std::string messageWithSender = "[" + getTimeserv() + "] " + client->name + ": " + recvBuf;
+                    send(roomClient.socket, messageWithSender.c_str(), messageWithSender.length() + 30, 0);
+                }
+            }
+            if (strcmp(recvBuf, "/hub") == 0) {
+                rooms["Hub"].push_back(*client);
+                ShowMenuAndSelectRoom(client, rooms);
+            }
+            else if (strcmp(recvBuf, "/disconnect") == 0) {
+                std::string disconnectMsg = "Вы отключены от чата.";
+                send(client->socket, disconnectMsg.c_str(), disconnectMsg.length(), 0);
+                closesocket(client->socket);
+                delete client;
+                return;
+            }
+            else {
             }
         }
         else if (recvResult == 0) {
@@ -218,8 +260,6 @@ int main() {
     InitializeWinsock();
 
     SOCKET serverSocket = CreateServerSocket(12345);
-
-    std::cout << "Сервер успешно запущен\n";
 
     std::map<std::string, std::vector<ClientInfo>> rooms;
     std::map<std::string, std::vector<std::string>> roomMessages;

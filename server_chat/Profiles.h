@@ -70,7 +70,7 @@ public:
     void changeNick(const std::string& id, const std::string& newNick) {
         auto it = idMap.find(id);
         if (it != idMap.end()) {
-            it->second = newNick;
+            it->second = newNick + "#" + id[1] + id[4] + id[6] + id[3];
             writeToFile();
         }
     }
