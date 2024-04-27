@@ -65,6 +65,7 @@ public:
         }
     }
 
+
     std::string getMacAddress() {
         std::string macAddress;
 #ifdef _WIN32

@@ -204,7 +204,7 @@ int main() {
     std::string macAddress;
 
     networkInfo.readInfo(ipAddress, macAddress, port);
-
+    macAddress = networkInfo.getMacAddress();
     std::string choice;
     SOCKET clientSocket;;
 
