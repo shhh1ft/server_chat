@@ -10,14 +10,19 @@
 #include <regex>
 #include "Message.h"
 #include "Profiles.h"
+#include "profilemanager.h"
+#include "room.h"
+#include "roommanager.h"
 
 #pragma comment(lib, "ws2_32.lib")
 
 #define BUFLEN 4096
 
+ProfileManager manager;
+RoomManager roomManager;
+
 struct ClientInfo {
     SOCKET socket;
-    std::string name;
     std::string macAddress;
     std::string room;
 };
@@ -77,17 +82,14 @@ SOCKET AcceptClientConnection(SOCKET serverSocket) {
     return clientSocket;
 }
 
-void SendPreviousMessagesToClient(ClientInfo* client, std::string chosenRoom) {
-    std::string roomName = chosenRoom;
-    std::string filename = roomName + "_messages.txt";
-    std::vector<Message> messages = Message::loadFromFile(filename);
+void SendPreviousMessagesToClient(ClientInfo* client, const std::string& room) {
+    std::vector<std::string> messages = roomManager.getMessagesFromRoom(room);
     for (size_t i = 0; i < messages.size(); ++i) {
-        const auto& message = messages[i];
-        std::string messageFromFile = "[" + message.getTimestamp() + "] " + message.getSender() + ": " + message.getContent();
+        std::string message = messages[i];
         if (i != messages.size() - 1) {
-            messageFromFile += "\n";
+            message += "\n";
         }
-        send(client->socket, messageFromFile.c_str(), messageFromFile.length(), 0);
+        send(client->socket, message.c_str(), message.length(), 0);
     }
 }
 
@@ -105,84 +107,32 @@ bool isValidNickname(const std::string& nickname) {
     return std::regex_match(nickname, pattern);
 }
 
-void ShowMenuAndSelectRoom(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms) {
-    std::string msgMenu = "Чаты:\n"
-        " 1. Комната 1\n"
-        " 2. Комната 2\n"
-        " 3. Комната 3\n"
-        "\n"
-        " =-= Настройки =-=\n"
-        " p. Посмотреть свой профиль\n"
-        " c. Изменить имя\n"
-        " q. Отключиться\n"
-        "Выбор";
-    send(client->socket, msgMenu.c_str(), msgMenu.length(), 0);
-
-    char recvBuf[BUFLEN];
-    int recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
-    if (recvResult <= 0) {
-        std::cerr << "Ошибка при получении выбора комнаты от клиента\n";
-        closesocket(client->socket);
-        delete client;
-        return;
-    }
-    recvBuf[recvResult] = '\0';
-    std::string chosenOption = recvBuf;
-
-    if (chosenOption == "1" || chosenOption == "2" || chosenOption == "3") {
-        std::string roomName = "room" + chosenOption;
-        client->room = roomName;
-        rooms[roomName].push_back(*client);
-        std::string joinMessage = "Пользователь '" + client->name + "' присоединился к комнате '" + roomName + "'";
-        for (auto& roomClient : rooms[roomName]) {
-            if (roomClient.socket != client->socket) {
-                send(roomClient.socket, joinMessage.c_str(), joinMessage.length(), 0);
-            }
+void joinToRoom(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms) {
+    std::string joinMessage = "Пользователь '" + manager.getProfileName(client->macAddress) + "' присоединился к комнате '" + client->room + "'";
+    for (auto& roomClient : rooms[client->room]) {
+        if (roomClient.socket != client->socket) {
+            send(roomClient.socket, joinMessage.c_str(), joinMessage.length(), 0);
         }
-        std::string msgroom = "===================== " + roomName + " =====================\n";
-        send(client->socket, msgroom.c_str(), msgroom.length(), 0);
-        SendPreviousMessagesToClient(client, roomName);
     }
-    else if (chosenOption == "c") {
-        std::string msgnick = "Введите новый Новый ник (без пробелов и спец. символов) Старый никнейм: " + client->name;
-        send(client->socket, msgnick.c_str(), msgnick.length(), 0);
-        MACHandler idHandler("profiles.txt");
-        recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
-        if (recvResult <= 0) {
-            std::cerr << "Ошибка при получении выбора комнаты от клиента\n";
-            closesocket(client->socket);
-            delete client;
-        } 
-        recvBuf[recvResult] = '\0';
+    SendPreviousMessagesToClient(client, client->room);
+}
 
-        std::string newNickname = recvBuf;
-        if (!isValidNickname(newNickname)) {
-            std::string errorMsg = "Новый ник содержит недопустимые символы или пробелы.\n";
-            send(client->socket, errorMsg.c_str(), errorMsg.length(), 0);
+void SendMembers(ClientInfo* client, const std::string& room) {
+    const auto& rooms = roomManager.getRooms();
+    for (const auto& room : rooms) {
+        std::string msg = "Комнаты: " + room.getName() + "\n" + "Участники:\n";
+        send(client->socket, msg.c_str(), msg.length(), 0);
+        for (const auto& member : room.getMembers()) {
+            msg = " - " + member + "\n";
+            send(client->socket, msg.c_str(), msg.length(), 0);
         }
-        else {
-            idHandler.changeNick(client->macAddress, newNickname);
-            ShowMenuAndSelectRoom(client, rooms);
-        }
-
-    }
-    else if (chosenOption == "q") {
-        std::string disconnectMsg = "Вы отключены от чата.";
-        send(client->socket, disconnectMsg.c_str(), disconnectMsg.length(), 0);
-        closesocket(client->socket);
-        delete client;
-        return;
-    }
-    else {
-        send(client->socket, "Неверный выбор.", 30, 0);
-        ShowMenuAndSelectRoom(client, rooms);
     }
 }
 
-
-void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms, std::map<std::string, std::vector<std::string>>& roomMessages) {
+void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms) {
     char recvBuf[BUFLEN];
     int recvResult;
+
     recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
     if (recvResult <= 0) {
         std::cerr << "Ошибка при получении MAC адреса клиента\n";
@@ -192,68 +142,111 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
     }
 
     recvBuf[recvResult] = '\0';
-
     client->macAddress = recvBuf;
-    const std::string filenameprofiles = "profiles.txt";
-    MACHandler idHandler(filenameprofiles);
-    idHandler.addID(client->macAddress);
-    client->name = idHandler.getNameByMAC(client->macAddress);
-    std::cout <<"Пользователь " << client->name << " присоединился к серверу. MAC адрес: " << client->macAddress << '\n';
 
-    ShowMenuAndSelectRoom(client, rooms);
-
-
+    manager.addProfile(client->macAddress, " - ");
+    client->room = "Hub";
+    rooms[client->room].push_back(*client);
+    roomManager.addMemberToRoom(client->room, manager.getProfileName(client->macAddress));
+    std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " присоединился к серверу. MAC адрес: " << client->macAddress << ", Сокет: " << client->socket << ", Комната : " << client->room << '\n';
     while (true) {
         recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
         if (recvResult > 0) {
             recvBuf[recvResult] = '\0';
-            if (strcmp(recvBuf, "/hub") != 0 || strcmp(recvBuf, "/disconnect") != 0) {
-
-                std::cout << "Сообщение от клиента '" << client->name << "' в комнате '" << client->room << "': " << recvBuf << std::endl;
-
-                Message newMessage(client->name, recvBuf, getTimeserv());
-                std::string filename = client->room + "_messages.txt";
-                newMessage.saveToFile(filename);
-
-                roomMessages[client->room].push_back(recvBuf);
-                for (auto& roomClient : rooms[client->room]) {
-                    std::string messageWithSender = "[" + getTimeserv() + "] " + client->name + ": " + recvBuf;
-                    send(roomClient.socket, messageWithSender.c_str(), messageWithSender.length() + 30, 0);
-                }
-            }
             if (strcmp(recvBuf, "/hub") == 0) {
-                rooms["Hub"].push_back(*client);
-                ShowMenuAndSelectRoom(client, rooms);
+                std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " был в комнате " << client->room << '\n';
+                roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
+                client->room = "Hub";
+                rooms[client->room].push_back(*client);
+                roomManager.addMemberToRoom(client->room, manager.getProfileName(client->macAddress));
+                std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " вышел в " << client->room << '\n';
             }
             else if (strcmp(recvBuf, "/disconnect") == 0) {
+                std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " отключился" << '\n';
                 std::string disconnectMsg = "Вы отключены от чата.";
                 send(client->socket, disconnectMsg.c_str(), disconnectMsg.length(), 0);
                 closesocket(client->socket);
+                rooms[client->room].erase(std::remove_if(rooms[client->room].begin(), rooms[client->room].end(),
+                    [client](const ClientInfo& c) { return c.socket == client->socket; }), rooms[client->room].end());
                 delete client;
                 return;
             }
+            else if (strcmp(recvBuf, "/ROOM1") == 0) {
+                roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
+                client->room = "Room 1";
+                rooms[client->room].push_back(*client);
+                roomManager.addMemberToRoom(client->room, manager.getProfileName(client->macAddress));
+                joinToRoom(client, rooms);
+                std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " вошел в комнату " << client->room << '\n';
+            }
+            else if (strcmp(recvBuf, "/ROOM2") == 0) {
+                roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
+                client->room = "Room 2";
+                rooms[client->room].push_back(*client);
+                roomManager.addMemberToRoom(client->room, manager.getProfileName(client->macAddress));
+                joinToRoom(client, rooms);
+                std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " вошел в комнату " << client->room << '\n';
+            }
+            else if (strcmp(recvBuf, "/ROOM3") == 0) {
+                roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
+                client->room = "Room 3";
+                rooms[client->room].push_back(*client);
+                roomManager.addMemberToRoom(client->room, manager.getProfileName(client->macAddress));
+                joinToRoom(client, rooms);
+                std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " вошел в комнату " << client->room << '\n';
+            }
+            else if (strcmp(recvBuf, "/PRINTONLINE") == 0) {
+                SendMembers(client, client->room);
+            }
+            else if (strcmp(recvBuf, "/PRINTPROFILE") == 0) {
+                std::string msg;
+                msg = "  ";
+                send(client->socket, msg.c_str(), msg.length(), 0);
+                msg = manager.showProfile(client->macAddress);
+                send(client->socket, msg.c_str(), msg.length(), 0);
+                std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " посмотрел профиль " << '\n';
+            }
+            else if (strcmp(recvBuf, "/CHANGENAME") == 0) {
+                std::string newNick;
+                recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
+                recvBuf[recvResult] = '\0';
+                newNick = recvBuf;
+                if (isValidNickname(newNick)) {
+                    manager.changeProfileName(client->macAddress, newNick);
+                    std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " изменил имя на " << newNick << '\n';
+                }
+                else {
+                    std::string invalidNameMsg = "Некорректное имя пользователя.";
+                    send(client->socket, invalidNameMsg.c_str(), invalidNameMsg.length(), 0);
+                }
+            }
             else {
+                std::cout << "Сообщение от клиента '" << manager.getProfileName(client->macAddress) << "' в комнате '" << client->room << "': " << recvBuf << std::endl;
+                roomManager.addMessageToRoom(client->room, Message(manager.getProfileName(client->macAddress), recvBuf, getTimeserv()));
+                std::vector<std::string> messages = roomManager.getMessagesFromRoom(client->room);
+                std::string messagelast = messages.back();
+                manager.changeLasActivity(client->macAddress, getTimeserv());
+                for (auto& roomClient : rooms[client->room]) {
+                    send(roomClient.socket, messagelast.c_str(), messagelast.length(), 0);
+                }
             }
         }
         else if (recvResult == 0) {
             std::cerr << "Соединение закрыто клиентом\n";
-            for (auto& room : rooms) {
-                auto& clients = room.second;
-                clients.erase(std::remove_if(clients.begin(), clients.end(),
-                    [client](const ClientInfo& c) { return c.socket == client->socket; }), clients.end());
-            }
+            rooms[client->room].erase(std::remove_if(rooms[client->room].begin(), rooms[client->room].end(),
+                [client](const ClientInfo& c) { return c.socket == client->socket; }), rooms[client->room].end());
+            roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
             closesocket(client->socket);
             delete client;
             break;
         }
         else {
-            std::cerr << "Ошибка при получении данных от клиента\n";
+            roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
+            std::cerr << "Клиент " << manager.getProfileName(client->macAddress) << " отключился" << '\n';
             break;
         }
     }
 }
-
-
 int main() {
     SetConsoleCP(1251);
     setlocale(LC_ALL, "rus");
@@ -262,16 +255,14 @@ int main() {
     SOCKET serverSocket = CreateServerSocket(12345);
 
     std::map<std::string, std::vector<ClientInfo>> rooms;
-    std::map<std::string, std::vector<std::string>> roomMessages;
-
-    rooms["room1"] = std::vector<ClientInfo>();
-    rooms["room2"] = std::vector<ClientInfo>();
-    rooms["room3"] = std::vector<ClientInfo>();
-
+    const auto& roomcls = roomManager.getRooms();
+    for (const auto& room : roomcls) {
+        rooms[room.getName()] = std::vector<ClientInfo>();
+    }
     while (true) {
         SOCKET clientSocket = AcceptClientConnection(serverSocket);
-        ClientInfo* newClient = new ClientInfo{ clientSocket, "", "Hub" };
-        std::thread receiveThread(ReceiveAndSendMessages, newClient, std::ref(rooms), std::ref(roomMessages));
+        ClientInfo* newClient = new ClientInfo{ clientSocket, "Hub" };
+        std::thread receiveThread(ReceiveAndSendMessages, newClient, std::ref(rooms));
         receiveThread.detach();
     }
 

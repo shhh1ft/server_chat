@@ -128,12 +128,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Message.cpp" />
+    <ClCompile Include="profilemanager.cpp" />
     <ClCompile Include="Profiles.cpp" />
     <ClCompile Include="server_chat.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Message.h" />
+    <ClInclude Include="messagemanager.h" />
+    <ClInclude Include="profilemanager.h" />
     <ClInclude Include="Profiles.h" />
+    <ClInclude Include="room.h" />
+    <ClInclude Include="roommanager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

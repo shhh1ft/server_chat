@@ -14,6 +14,8 @@
 
 #define BUFLEN 4096
 
+std::vector<std::string> messageHistory;
+
 void InitializeWinsock() {
     WSADATA wsData;
     WORD ver = MAKEWORD(2, 2);
@@ -76,15 +78,87 @@ void SendToServer(SOCKET clientSocket, const char* data) {
     }
 }
 
+void displayMenu2() {
+    std::cout << "Чаты:\n"
+        " 1. Комната 1\n"
+        " 2. Комната 2\n"
+        " 3. Комната 3\n"
+        "\n"
+        " =-= Настройки =-=\n"
+        " o. Показать онлайн\n"
+        " p. Посмотреть свой профиль\n"
+        " c. Изменить имя\n"
+        " q. Отключиться\n"
+        "Выбор: ";
+}
+
+void MenuChoise2(SOCKET clientSocket) {
+    std::string choice;
+    while (true) {
+        displayMenu2();
+        std::getline(std::cin, choice);
+        if (choice == "1") {
+            SendToServer(clientSocket, "/ROOM1");
+            system("cls");
+            break;
+        }
+        else if (choice == "2") {
+            SendToServer(clientSocket, "/ROOM2");
+            system("cls");
+            break;
+        }
+        else if (choice == "3") {
+            SendToServer(clientSocket, "/ROOM3");
+            system("cls");
+            break;
+        }
+        else if (choice == "p") {
+            SendToServer(clientSocket, "/PRINTPROFILE");
+            messageHistory.clear();
+            system("cls");
+            char recvBuf[BUFLEN];
+            int recvResult = ReceiveFromServer(clientSocket, recvBuf);
+            std::cout << recvBuf << std::endl << std::endl;
+        }
+        else if (choice == "o") {
+            SendToServer(clientSocket, "/PRINTONLINE");
+            messageHistory.clear();
+            system("cls");
+            char recvBuf[BUFLEN];
+            int recvResult = ReceiveFromServer(clientSocket, recvBuf);
+            std::cout << recvBuf;
+        }
+        else if (choice == "c") {
+            SendToServer(clientSocket, "/CHANGENAME");
+            std::string name;
+            std::cout << "Введите новый ник: " << std::endl;
+            std::getline(std::cin, name);
+            SendToServer(clientSocket, name.c_str());
+        }
+        else if (choice == "q") {
+            exit(0);
+        }
+    }
+}
+
 void SendMessageThread(SOCKET clientSocket) {
     while (true) {
         std::string message;
         std::getline(std::cin, message);
-        SendToServer(clientSocket, message.c_str());
+        if (message == "/hub") {
+            SendToServer(clientSocket, message.c_str());
+            system("cls");
+            MenuChoise2(clientSocket);
+            messageHistory.clear();
+        }
+        else {
+            SendToServer(clientSocket, message.c_str());
+        }
     }
 }
-void displayMenu() {
-    std::cout << "^^^^^^^^^^^^^^^^^Клиент локального чата v0.3^^^^^^^^^^^^^^^^^\n"
+
+void displayMenu1() {
+    std::cout << "^^^^^^^^^^^^^^^^^Клиент локального чата v0.5^^^^^^^^^^^^^^^^^\n"
         "Выберите операцию:\n"
         " 1. Подключиться\n"
         " 2. Ввести кастомный IP\n"
@@ -95,7 +169,7 @@ void displayMenu() {
         "Выбор: ";
 }
 
-void MenuChoice(std::string choice, std::string& ipAddress, int& port, const std::string& filenameConfig, ConfigClient& networkInfo) {
+void MenuChoice1(std::string choice, std::string& ipAddress, int& port, const std::string& filenameConfig, ConfigClient& networkInfo) {
     switch (choice[0]) {
     case '1': {
         break;
@@ -205,46 +279,33 @@ int main() {
 
     networkInfo.readInfo(ipAddress, macAddress, port);
     macAddress = networkInfo.getMacAddress();
-    std::string choice;
-    SOCKET clientSocket;;
+    std::string choise;
+    SOCKET clientSocket;
 
     do {
-        displayMenu();
-        std::getline(std::cin, choice);
-        MenuChoice(choice, ipAddress, port, filenameConfig, networkInfo);
-    } while (choice[0] != '1');
+        displayMenu1();
+        std::getline(std::cin, choise);
+        MenuChoice1(choise, ipAddress, port, filenameConfig, networkInfo);
+    } while (choise[0] != '1');
     system("cls");
     clientSocket = ConnectToServer(ipAddress.c_str(), port);
     std::cout << "Подключение к серверу успешно\n";
 
     SendToServer(clientSocket, macAddress.c_str());
+    MenuChoise2(clientSocket);
+
+    std::thread sendThread(SendMessageThread, clientSocket);
+    sendThread.detach();
 
     char recvBuf[BUFLEN];
-    std::vector<std::string> messageHistory;
-
     int recvResult;
-
-
-    while (true) {
-        recvResult = ReceiveFromServer(clientSocket, recvBuf);
-
-        messageHistory.push_back(recvBuf);
-        for (int i = 0; i < messageHistory.size(); ++i) {
-            std::cout << messageHistory[i] << std::endl;
-        }
-        if (messageHistory.size() > 0) {
-            std::thread sendThread(SendMessageThread, clientSocket);
-            sendThread.detach();
-            break;
-        }
-    }
 
     while (true) {
         recvResult = ReceiveFromServer(clientSocket, recvBuf);
         messageHistory.push_back(recvBuf);
         system("cls");
-        for (int i = 0; i < messageHistory.size(); ++i) {
-            std::cout << messageHistory[i] << std::endl;
+        for (const auto& msg : messageHistory) {
+            std::cout << msg << std::endl;
         }
     }
 
