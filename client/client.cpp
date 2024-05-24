@@ -12,7 +12,7 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-#define BUFLEN 4096
+#define BUFLEN 2048
 
 std::vector<std::string> messageHistory;
 
@@ -79,7 +79,7 @@ void SendToServer(SOCKET clientSocket, const char* data) {
 }
 
 void displayMenu2() {
-    std::cout << "Чаты:\n"
+    std::cout << "\nЧаты:\n"
         " 1. Комната 1\n"
         " 2. Комната 2\n"
         " 3. Комната 3\n"
@@ -95,19 +95,23 @@ void displayMenu2() {
 void MenuChoise2(SOCKET clientSocket) {
     std::string choice;
     while (true) {
+        Sleep(300);
         displayMenu2();
         std::getline(std::cin, choice);
         if (choice == "1") {
+            messageHistory.clear();
             SendToServer(clientSocket, "/ROOM1");
             system("cls");
             break;
         }
         else if (choice == "2") {
+            messageHistory.clear();
             SendToServer(clientSocket, "/ROOM2");
             system("cls");
             break;
         }
         else if (choice == "3") {
+            messageHistory.clear();
             SendToServer(clientSocket, "/ROOM3");
             system("cls");
             break;
@@ -116,17 +120,11 @@ void MenuChoise2(SOCKET clientSocket) {
             SendToServer(clientSocket, "/PRINTPROFILE");
             messageHistory.clear();
             system("cls");
-            char recvBuf[BUFLEN];
-            int recvResult = ReceiveFromServer(clientSocket, recvBuf);
-            std::cout << recvBuf << std::endl << std::endl;
         }
         else if (choice == "o") {
             SendToServer(clientSocket, "/PRINTONLINE");
             messageHistory.clear();
             system("cls");
-            char recvBuf[BUFLEN];
-            int recvResult = ReceiveFromServer(clientSocket, recvBuf);
-            std::cout << recvBuf;
         }
         else if (choice == "c") {
             SendToServer(clientSocket, "/CHANGENAME");
@@ -142,6 +140,10 @@ void MenuChoise2(SOCKET clientSocket) {
 }
 
 void SendMessageThread(SOCKET clientSocket) {
+    SendToServer(clientSocket, "/hub");
+    system("cls");
+    MenuChoise2(clientSocket);
+    messageHistory.clear();
     while (true) {
         std::string message;
         std::getline(std::cin, message);
@@ -158,7 +160,7 @@ void SendMessageThread(SOCKET clientSocket) {
 }
 
 void displayMenu1() {
-    std::cout << "^^^^^^^^^^^^^^^^^Клиент локального чата v0.5^^^^^^^^^^^^^^^^^\n"
+    std::cout << "^^^^^^^^^^^^^^^^^Клиент локального чата v0.6^^^^^^^^^^^^^^^^^\n"
         "Выберите операцию:\n"
         " 1. Подключиться\n"
         " 2. Ввести кастомный IP\n"
@@ -292,11 +294,8 @@ int main() {
     std::cout << "Подключение к серверу успешно\n";
 
     SendToServer(clientSocket, macAddress.c_str());
-    MenuChoise2(clientSocket);
-
     std::thread sendThread(SendMessageThread, clientSocket);
     sendThread.detach();
-
     char recvBuf[BUFLEN];
     int recvResult;
 

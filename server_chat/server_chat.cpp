@@ -16,7 +16,7 @@
 
 #pragma comment(lib, "ws2_32.lib")
 
-#define BUFLEN 4096
+#define BUFLEN 2048
 
 ProfileManager manager;
 RoomManager roomManager;
@@ -117,16 +117,26 @@ void joinToRoom(ClientInfo* client, std::map<std::string, std::vector<ClientInfo
     SendPreviousMessagesToClient(client, client->room);
 }
 
+void SendProfile(ClientInfo* client) {
+    std::string msg;
+    msg = manager.showProfile(client->macAddress);
+    Sleep(50);
+    send(client->socket, msg.c_str(), msg.length(), 0);
+    std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " посмотрел профиль " << '\n';
+}
+
 void SendMembers(ClientInfo* client, const std::string& room) {
     const auto& rooms = roomManager.getRooms();
+    std::string msg;
     for (const auto& room : rooms) {
-        std::string msg = "Комнаты: " + room.getName() + "\n" + "Участники:\n";
-        send(client->socket, msg.c_str(), msg.length(), 0);
+        std::string roomInfo = "\nКомнаты: " + room.getName() + "\n" + "Участники:";
+        msg += roomInfo;
         for (const auto& member : room.getMembers()) {
-            msg = " - " + member + "\n";
-            send(client->socket, msg.c_str(), msg.length(), 0);
+            std::string memberInfo = "\n - " + member;
+            msg += memberInfo;
         }
     }
+    send(client->socket, msg.c_str(), msg.length(), 0);
 }
 
 void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms) {
@@ -154,7 +164,9 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
         if (recvResult > 0) {
             recvBuf[recvResult] = '\0';
             if (strcmp(recvBuf, "/hub") == 0) {
-                std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " был в комнате " << client->room << '\n';
+                auto& currentRoomClients = rooms[client->room];
+                currentRoomClients.erase(std::remove_if(currentRoomClients.begin(), currentRoomClients.end(),
+                    [client](const ClientInfo& c) { return c.socket == client->socket; }), currentRoomClients.end());
                 roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
                 client->room = "Hub";
                 rooms[client->room].push_back(*client);
@@ -172,6 +184,9 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
                 return;
             }
             else if (strcmp(recvBuf, "/ROOM1") == 0) {
+                auto& currentRoomClients = rooms[client->room];
+                currentRoomClients.erase(std::remove_if(currentRoomClients.begin(), currentRoomClients.end(),
+                    [client](const ClientInfo& c) { return c.socket == client->socket; }), currentRoomClients.end());
                 roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
                 client->room = "Room 1";
                 rooms[client->room].push_back(*client);
@@ -180,6 +195,9 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
                 std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " вошел в комнату " << client->room << '\n';
             }
             else if (strcmp(recvBuf, "/ROOM2") == 0) {
+                auto& currentRoomClients = rooms[client->room];
+                currentRoomClients.erase(std::remove_if(currentRoomClients.begin(), currentRoomClients.end(),
+                    [client](const ClientInfo& c) { return c.socket == client->socket; }), currentRoomClients.end());
                 roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
                 client->room = "Room 2";
                 rooms[client->room].push_back(*client);
@@ -188,6 +206,9 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
                 std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " вошел в комнату " << client->room << '\n';
             }
             else if (strcmp(recvBuf, "/ROOM3") == 0) {
+                auto& currentRoomClients = rooms[client->room];
+                currentRoomClients.erase(std::remove_if(currentRoomClients.begin(), currentRoomClients.end(),
+                    [client](const ClientInfo& c) { return c.socket == client->socket; }), currentRoomClients.end());
                 roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
                 client->room = "Room 3";
                 rooms[client->room].push_back(*client);
@@ -199,12 +220,7 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
                 SendMembers(client, client->room);
             }
             else if (strcmp(recvBuf, "/PRINTPROFILE") == 0) {
-                std::string msg;
-                msg = "  ";
-                send(client->socket, msg.c_str(), msg.length(), 0);
-                msg = manager.showProfile(client->macAddress);
-                send(client->socket, msg.c_str(), msg.length(), 0);
-                std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " посмотрел профиль " << '\n';
+                SendProfile(client);
             }
             else if (strcmp(recvBuf, "/CHANGENAME") == 0) {
                 std::string newNick;
@@ -259,6 +275,12 @@ int main() {
     for (const auto& room : roomcls) {
         rooms[room.getName()] = std::vector<ClientInfo>();
     }
+    roomManager.addMessageToRoom("Room 1", Message("Команды", "/hub /disconnect", "!"));
+    roomManager.addMessageToRoom("Room 1", Message("", "Комната 1", "!"));
+    roomManager.addMessageToRoom("Room 2", Message("Команды", "/hub /disconnect", "!"));
+    roomManager.addMessageToRoom("Room 2", Message("", "Комната 2", "!"));
+    roomManager.addMessageToRoom("Room 3", Message("Команды", "/hub /disconnect", "!"));
+    roomManager.addMessageToRoom("Room 3", Message("", "Комната 3", "!"));
     while (true) {
         SOCKET clientSocket = AcceptClientConnection(serverSocket);
         ClientInfo* newClient = new ClientInfo{ clientSocket, "Hub" };
