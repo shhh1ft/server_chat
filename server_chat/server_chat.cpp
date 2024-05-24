@@ -157,7 +157,7 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
     client->room = "Hub";
     rooms[client->room].push_back(*client);
     roomManager.addMemberToRoom(client->room, manager.getProfileName(client->macAddress));
-    std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " присоединился к серверу. MAC адрес: " << client->macAddress << ", Сокет: " << client->socket << ", Комната : " << client->room << '\n';
+    std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " присоединился к серверу. MAC адрес: " << client->macAddress << ", Сокет: " << client->socket << ", Комната: " << client->room << '\n';
     while (true) {
         recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
         if (recvResult > 0) {
@@ -222,14 +222,15 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
                 SendProfile(client);
             }
             else if (strcmp(recvBuf, "/CHANGENAME") == 0) {
-                std::string newNick;
+                std::string newNick, oldNick;
                 recvResult = recv(client->socket, recvBuf, BUFLEN, 0);
                 recvBuf[recvResult] = '\0';
                 newNick = recvBuf;
+                oldNick = manager.getProfileName(client->macAddress);
                 if (isValidNickname(newNick)) {
                     roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
                     manager.changeProfileName(client->macAddress, newNick);
-                    std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " изменил имя на " << newNick << '\n';
+                    std::cout << "Пользователь " << oldNick << " изменил имя на " << manager.getProfileName(client->macAddress) << '\n';
                     roomManager.addMemberToRoom(client->room, manager.getProfileName(client->macAddress));
                 }
                 else {
@@ -276,12 +277,12 @@ int main() {
     for (const auto& room : roomcls) {
         rooms[room.getName()] = std::vector<ClientInfo>();
     }
-    roomManager.addMessageToRoom("Room 1", Message("!", "!", "!"));
-    roomManager.addMessageToRoom("Room 1", Message("Команды", "/hub /disconnect", "Комната 1"));
-    roomManager.addMessageToRoom("Room 2", Message("!", "!", "!"));
-    roomManager.addMessageToRoom("Room 2", Message("Команды", "/hub /disconnect", "Комната 2"));
-    roomManager.addMessageToRoom("Room 3", Message("!", "!", "!"));
-    roomManager.addMessageToRoom("Room 3", Message("Команды", "/hub /disconnect", "Комната 3"));
+    roomManager.addMessageToRoom("Room 1", Message("Команды", "/hub /disconnect", "!"));
+    roomManager.addMessageToRoom("Room 1", Message("Комната", "№1", "!"));
+    roomManager.addMessageToRoom("Room 2", Message("Команды", "/hub /disconnect", "!"));
+    roomManager.addMessageToRoom("Room 2", Message("Комната", "№2", "!"));
+    roomManager.addMessageToRoom("Room 3", Message("Команды", "/hub /disconnect", "!"));
+    roomManager.addMessageToRoom("Room 3", Message("Комната", "№3", "!"));
 
     while (true) {
         SOCKET clientSocket = AcceptClientConnection(serverSocket);
