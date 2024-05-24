@@ -285,7 +285,6 @@ int main() {
     macAddress = networkInfo.getMacAddress();
     std::string choise;
     SOCKET clientSocket;
-
     do {
         displayMenu1();
         std::getline(std::cin, choise);
