@@ -120,7 +120,6 @@ void joinToRoom(ClientInfo* client, std::map<std::string, std::vector<ClientInfo
 void SendProfile(ClientInfo* client) {
     std::string msg;
     msg = manager.showProfile(client->macAddress);
-    Sleep(50);
     send(client->socket, msg.c_str(), msg.length(), 0);
     std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " посмотрел профиль " << '\n';
 }
@@ -228,8 +227,10 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
                 recvBuf[recvResult] = '\0';
                 newNick = recvBuf;
                 if (isValidNickname(newNick)) {
+                    roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
                     manager.changeProfileName(client->macAddress, newNick);
                     std::cout << "Пользователь " << manager.getProfileName(client->macAddress) << " изменил имя на " << newNick << '\n';
+                    roomManager.addMemberToRoom(client->room, manager.getProfileName(client->macAddress));
                 }
                 else {
                     std::string invalidNameMsg = "Некорректное имя пользователя.";
@@ -248,7 +249,7 @@ void ReceiveAndSendMessages(ClientInfo* client, std::map<std::string, std::vecto
             }
         }
         else if (recvResult == 0) {
-            std::cerr << "Соединение закрыто клиентом\n";
+            std::cerr << "Соединение закрыто клиентом" << manager.getProfileName(client->macAddress) << '\n';
             rooms[client->room].erase(std::remove_if(rooms[client->room].begin(), rooms[client->room].end(),
                 [client](const ClientInfo& c) { return c.socket == client->socket; }), rooms[client->room].end());
             roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
@@ -275,12 +276,13 @@ int main() {
     for (const auto& room : roomcls) {
         rooms[room.getName()] = std::vector<ClientInfo>();
     }
-    roomManager.addMessageToRoom("Room 1", Message("Команды", "/hub /disconnect", "!"));
-    roomManager.addMessageToRoom("Room 1", Message("", "Комната 1", "!"));
-    roomManager.addMessageToRoom("Room 2", Message("Команды", "/hub /disconnect", "!"));
-    roomManager.addMessageToRoom("Room 2", Message("", "Комната 2", "!"));
-    roomManager.addMessageToRoom("Room 3", Message("Команды", "/hub /disconnect", "!"));
-    roomManager.addMessageToRoom("Room 3", Message("", "Комната 3", "!"));
+    roomManager.addMessageToRoom("Room 1", Message("!", "!", "!"));
+    roomManager.addMessageToRoom("Room 1", Message("Команды", "/hub /disconnect", "Комната 1"));
+    roomManager.addMessageToRoom("Room 2", Message("!", "!", "!"));
+    roomManager.addMessageToRoom("Room 2", Message("Команды", "/hub /disconnect", "Комната 2"));
+    roomManager.addMessageToRoom("Room 3", Message("!", "!", "!"));
+    roomManager.addMessageToRoom("Room 3", Message("Команды", "/hub /disconnect", "Комната 3"));
+
     while (true) {
         SOCKET clientSocket = AcceptClientConnection(serverSocket);
         ClientInfo* newClient = new ClientInfo{ clientSocket, "Hub" };

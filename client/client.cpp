@@ -95,7 +95,6 @@ void displayMenu2() {
 void MenuChoise2(SOCKET clientSocket) {
     std::string choice;
     while (true) {
-        Sleep(300);
         displayMenu2();
         std::getline(std::cin, choice);
         if (choice == "1") {
@@ -120,11 +119,13 @@ void MenuChoise2(SOCKET clientSocket) {
             SendToServer(clientSocket, "/PRINTPROFILE");
             messageHistory.clear();
             system("cls");
+            Sleep(150);
         }
         else if (choice == "o") {
             SendToServer(clientSocket, "/PRINTONLINE");
             messageHistory.clear();
             system("cls");
+            Sleep(150);
         }
         else if (choice == "c") {
             SendToServer(clientSocket, "/CHANGENAME");
@@ -132,6 +133,7 @@ void MenuChoise2(SOCKET clientSocket) {
             std::cout << "Введите новый ник: " << std::endl;
             std::getline(std::cin, name);
             SendToServer(clientSocket, name.c_str());
+            system("cls");
         }
         else if (choice == "q") {
             exit(0);
