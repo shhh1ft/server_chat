@@ -152,6 +152,7 @@ void SendMessageThread(SOCKET clientSocket) {
         if (message == "/hub") {
             SendToServer(clientSocket, message.c_str());
             system("cls");
+            Sleep(40);
             MenuChoise2(clientSocket);
             messageHistory.clear();
         }
