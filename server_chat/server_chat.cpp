@@ -154,7 +154,7 @@ void deleteFromRoom(ClientInfo* client, std::map<std::string, std::vector<Client
 }
 
 void disconnect(ClientInfo* client, std::map<std::string, std::vector<ClientInfo>>& rooms) {
-    std::cerr << "Соединение закрыто клиентом" << manager.getProfileName(client->macAddress) << '\n';
+    std::cerr << "Соединение закрыто клиентом " << manager.getProfileName(client->macAddress) << '\n';
     rooms[client->room].erase(std::remove_if(rooms[client->room].begin(), rooms[client->room].end(),
         [client](const ClientInfo& c) { return c.socket == client->socket; }), rooms[client->room].end());
     roomManager.removeMemberFromRoom(client->room, manager.getProfileName(client->macAddress));
