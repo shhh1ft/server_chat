@@ -293,7 +293,6 @@ int main() {
     } while (choise[0] != '1');
     system("cls");
     clientSocket = ConnectToServer(ipAddress.c_str(), port);
-    std::cout << "Подключение к серверу успешно\n";
 
     SendToServer(clientSocket, macAddress.c_str());
     std::thread sendThread(SendMessageThread, clientSocket);
